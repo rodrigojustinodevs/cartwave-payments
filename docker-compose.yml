@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    env_file:
+      - .env
+    environment:
+      # Sobrescreve o .env local para o stack de desenvolvimento (evita NODE_ENV=production sem JWT ou PORT incompatível com o mapeamento)
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/cartwave_payments?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh scripts/docker-entrypoint-dev.sh
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: cartwave_payments
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cartwave_payments"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,307 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-03T00:00:00.000Z",
+  "__export_source": "cartwave-payments",
+  "resources": [
+    {
+      "_type": "workspace",
+      "_id": "wrk_cartwave_payments",
+      "parentId": null,
+      "name": "Cartwave Payments",
+      "description": "Importe no Insomnia (Application → Import). Após Login (200), o script grava access_token e user_id no ambiente ativo."
+    },
+    {
+      "_type": "environment",
+      "_id": "env_cartwave_base",
+      "parentId": "wrk_cartwave_payments",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "access_token": "",
+        "user_id": "",
+        "payment_id": ""
+      },
+      "dataPropertyOrder": {
+        "&": ["base_url", "access_token", "user_id", "payment_id"]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_auth",
+      "parentId": "wrk_cartwave_payments",
+      "name": "Auth",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -3000
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_users",
+      "parentId": "wrk_cartwave_payments",
+      "name": "Users",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -2000
+    },
+    {
+      "_type": "request_group",
+      "_id": "fld_payments",
+      "parentId": "wrk_cartwave_payments",
+      "name": "Payments",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": -1000
+    },
+    {
+      "_type": "request",
+      "_id": "req_login",
+      "parentId": "fld_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/v1/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"sua-senha\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -3000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "afterResponseScript": "if (insomnia.response.status === 200) {\n  const body = insomnia.response.json();\n  if (body && body.token) {\n    insomnia.environment.set('access_token', body.token);\n  }\n  if (body && body.user && body.user.id) {\n    insomnia.environment.set('user_id', body.user.id);\n  }\n}"
+    },
+    {
+      "_type": "request",
+      "_id": "req_register",
+      "parentId": "fld_users",
+      "name": "Registrar usuário",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/v1/users",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"novo@example.com\",\n  \"name\": \"Nome\",\n  \"password\": \"senha1234\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -2000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_me",
+      "parentId": "fld_users",
+      "name": "Perfil (me)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/v1/users/me",
+      "body": {},
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1990,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_users_list",
+      "parentId": "fld_users",
+      "name": "Listar usuários (admin)",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/v1/users?page=1&pageSize=20",
+      "body": {},
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1980,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_users_get",
+      "parentId": "fld_users",
+      "name": "Obter usuário por ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/v1/users/{{ _.user_id }}",
+      "body": {},
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1970,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_users_update",
+      "parentId": "fld_users",
+      "name": "Atualizar usuário",
+      "method": "PUT",
+      "url": "{{ _.base_url }}/api/v1/users/{{ _.user_id }}",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Novo nome\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1960,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_users_delete",
+      "parentId": "fld_users",
+      "name": "Remover usuário (admin)",
+      "method": "DELETE",
+      "url": "{{ _.base_url }}/api/v1/users/{{ _.user_id }}",
+      "body": {},
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1950,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_type": "request",
+      "_id": "req_payments_create",
+      "parentId": "fld_payments",
+      "name": "Iniciar pagamento",
+      "method": "POST",
+      "url": "{{ _.base_url }}/api/v1/payments",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"amount\": 1000,\n  \"currency\": \"BRL\",\n  \"method\": \"PAYPAL\",\n  \"product_id\": \"87e9646a-8513-465b-b58d-6df44b9e4925\",\n  \"user_id\": \"{{ _.user_id }}\"\n}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -1000,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global",
+      "afterResponseScript": "if (insomnia.response.status === 201) {\n  const body = insomnia.response.json();\n  if (body && body.paymentId) {\n    insomnia.environment.set('payment_id', body.paymentId);\n  }\n}"
+    },
+    {
+      "_type": "request",
+      "_id": "req_payments_get",
+      "parentId": "fld_payments",
+      "name": "Status do pagamento",
+      "method": "GET",
+      "url": "{{ _.base_url }}/api/v1/payments/{{ _.payment_id }}",
+      "body": {},
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{ _.access_token }}"
+        }
+      ],
+      "authentication": {},
+      "parameters": [],
+      "metaSortKey": -990,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    }
+  ]
+}

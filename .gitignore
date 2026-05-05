@@ -1,0 +1,60 @@
+# Ambiente (manter .env.example versionado)
+.env*
+!.env.example
+
+# Dependências
+node_modules/
+
+# Logs e debug
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build / artefatos
+dist/
+build/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# Testes e cobertura
+coverage/
+
+# SonarQube / SonarCloud (scanner local)
+.scannerwork/
+
+# Docker (overrides locais)
+docker-compose.override.yml
+docker-compose.local.yml
+*.env.docker
+docker-data/
+
+# Dados locais / DB dev
+data/
+tmp/
+*.pid
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+*.dump
+pgdata/
+postgres-data/
+
+# IDE e editores
+.vscode/
+.idea/
+*.code-workspace
+
+# Backup / merge
+*.bak
+*.old
+*.orig
+*.rej
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
