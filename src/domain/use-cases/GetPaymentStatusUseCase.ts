@@ -2,15 +2,26 @@ import { UserRole } from '../entities/User.js';
 import type { PaymentRepositoryPort } from '../ports/PaymentRepositoryPort.js';
 import type { CodedError } from '../../types/errors.js';
 
+type UserRole = 'user' | 'admin';
 export interface PaymentAuthContext {
   actorUserId: string;
-  actorRole: string;
+  actorRole: UserRole;
+}
+
+export interface GetPaymentStatusOutput {
+  paymentId: string;
+  status: string;
 }
 
 export class GetPaymentStatusUseCase {
-  constructor(private readonly paymentRepository: PaymentRepositoryPort) {}
+  constructor(
+    private readonly paymentRepository: PaymentRepositoryPort,
+  ) {}
 
-  async execute(paymentId: string, auth: PaymentAuthContext) {
+  async execute(
+    paymentId: string,
+    auth: PaymentAuthContext,
+  ): Promise<GetPaymentStatusOutput> {
     const payment = await this.paymentRepository.findById(paymentId);
 
     if (!payment) {
@@ -21,10 +32,11 @@ export class GetPaymentStatusUseCase {
 
     const isOwner = payment.userId === auth.actorUserId;
     const isAdmin = auth.actorRole === UserRole.ADMIN;
+
     if (!isOwner && !isAdmin) {
-      const err = new Error('Forbidden') as CodedError;
-      err.code = 'FORBIDDEN';
-      throw err;
+      const error = new Error('Forbidden') as CodedError;
+      error.code = 'FORBIDDEN';
+      throw error;
     }
 
     return {
