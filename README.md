@@ -1,6 +1,6 @@
 # Cartwave Payments API
 
-API RESTful em Node.js para iniciação e verificação de status de pagamentos, integrada a um provedor externo fictício.
+API RESTful em **Node.js + TypeScript** para iniciação e verificação de status de pagamentos, integrada a um provedor externo fictício. O código-fonte fica em `src/` (`.ts`); produção compila para `dist/` via `tsc`.
 
 ---
 
@@ -35,13 +35,26 @@ O domínio de negócio (entidades e casos de uso) é completamente isolado de in
 
 | Camada | Responsabilidade |
 |---|---|
-| `domain/entities` | Regras de negócio e invariantes da entidade `Payment` |
+| `domain/entities` | Regras de negócio e invariantes (`Payment`, `User`) |
+| `domain/value-objects` | Tipos imutáveis com validação por construção (`Money`) |
+| `domain/errors` | Erros de domínio tipados (`DomainError`, `InvalidPaymentStateTransitionError`, …) |
 | `domain/ports` | Interfaces (contratos) para repositório e provedor externo |
 | `domain/use-cases` | Orquestração dos fluxos de negócio |
 | `infrastructure/database` | Adaptador PostgreSQL (implementa o port de repositório) |
 | `infrastructure/providers` | Adaptador HTTP para o provedor externo (axios) |
 | `infrastructure/http` | Controladores, rotas e middlewares Express |
-| `src/app.js` | Composição (wiring) de todas as dependências |
+| `src/app.ts` | Composição (wiring) de todas as dependências |
+
+#### Modelo rico de domínio
+
+- **`Money` (Value Object imutável)** — `src/domain/value-objects/Money.ts`. Encapsula `amount + currency`, valida formato ISO 4217 (3 letras), rejeita amounts não-positivos, não-finitos, com mais de 2 casas decimais ou acima de 10 dígitos (compatível com `Decimal(12, 2)` no Postgres). Armazena internamente em **minor units** (`Math.round(amount * 100)`) para evitar erros de IEEE-754; `equals()` é por valor, `Object.freeze` no construtor.
+- **`Payment` encapsulado** — `id`, `status`, `providerTxId`, `amount`, `currency`, `updatedAt` etc. são expostos apenas como **getters**. Mutação só acontece via métodos de domínio: `attachProviderTransaction(txId)`, `markAsProcessed(txId)`, `markAsFailed()`. Atribuição direta em strict mode lança `TypeError`.
+- **Máquina de estados explícita** — transições válidas declaradas em `ALLOWED_TRANSITIONS`:
+  - `PENDING → PROCESSED` (via `markAsProcessed`, exige `providerTxId` não vazio)
+  - `PENDING → FAILED` (via `markAsFailed`)
+  - `PROCESSED` e `FAILED` são **terminais** (sem saída); reaplicar a mesma transição é **idempotente** (no-op, importante para webhooks duplicados); transições inválidas lançam `InvalidPaymentStateTransitionError`.
+  - `attachProviderTransaction` só funciona em PENDING e mantém o status — separa "anexar referência do provedor" de "decidir o resultado".
+- **Erros tipados** — `DomainError` base com `code` estável, herdada por `InvalidPaymentStateTransitionError` (carrega `from`, `to`, `paymentId`) e `MissingProviderTransactionIdError`. Permite controllers/HTTP mapearem para status HTTP via `instanceof` ou `err.code`.
 
 ### 3. Estratégia de Testes
 
@@ -112,13 +125,18 @@ src/
 │   └── swagger.js                  # OpenAPI 3 (swagger-jsdoc)
 ├── domain/
 │   ├── entities/
-│   │   └── Payment.js              # Entidade de domínio
+│   │   └── Payment.js              # Entidade rica + máquina de estados
+│   ├── value-objects/
+│   │   └── Money.js                # VO imutável (amount + currency, ISO 4217)
+│   ├── errors/
+│   │   └── PaymentErrors.js        # DomainError, InvalidPaymentStateTransitionError, ...
 │   ├── ports/
-│   │   ├── PaymentRepositoryPort.js
-│   │   └── PaymentGateway.js
+│   │   ├── PaymentRepositoryPort.ts
+│   │   └── PaymentGateway.ts
 │   └── use-cases/
 │       ├── InitiatePaymentUseCase.js
-│       └── GetPaymentStatusUseCase.js
+│       ├── GetPaymentStatusUseCase.js
+│       └── PaymentWebhookService.js
 └── infrastructure/
     ├── database/
     │   ├── prisma.js                 # singleton PrismaClient
@@ -156,13 +174,27 @@ tests/
 
 ## Contratos da API
 
+### Envelope de resposta (auth, users, payments)
+
+Endpoints de autenticação, usuários e pagamentos retornam um envelope padronizado:
+
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": { }
+}
+```
+
+Em caso de erro: `{ "success": false, "message": "...", "data": null }`. Webhooks mantêm o formato `{ "received": true }`.
+
 ### Autenticação e usuários
 
 - **JWT**: envie `Authorization: Bearer <token>` nos endpoints protegidos (pagamentos e maioria de `/users`).
-- **Login**: `POST /api/v1/auth/login` com `{ "email", "password" }` → `{ token, user }`.
+- **Login**: `POST /api/v1/auth/login` com `{ "email", "password" }` → envelope com `data: { token, user }`.
 - **Registro**: `POST /api/v1/users` (público) com `{ "email", "name", "password" }` (senha mín. 8 caracteres).
 - **Perfil**: `GET /api/v1/users/me` (autenticado).
-- **Admin**: `GET /api/v1/users` (lista paginada), `DELETE /api/v1/users/:id`.
+- **Admin**: `GET /api/v1/users` (lista paginada), `DELETE /api/v1/users/:id` (retorna envelope com `data: null`).
 
 Documentação interativa: [Swagger UI](#documentação-openapi-swagger) em `/api-docs`.
 
@@ -186,12 +218,16 @@ Requer header `Authorization: Bearer ...`. No corpo, `user_id` deve ser o mesmo 
 **Response `201`:**
 ```json
 {
-  "paymentId": "b018b23b-9931-4438-b55f-782edb05b4c2",
-  "status": "pending" | "processed" | "failed"
+  "success": true,
+  "message": "Payment initiated successfully",
+  "data": {
+    "paymentId": "b018b23b-9931-4438-b55f-782edb05b4c2",
+    "status": "pending"
+  }
 }
 ```
 
-**Response `400`** — campos inválidos ou ausentes.
+**Response `400`** — `{ "success": false, "message": "...", "data": null }` (campos inválidos ou ausentes).
 
 ---
 
@@ -202,12 +238,16 @@ Requer `Authorization: Bearer ...`. Apenas o **dono** do pagamento ou um **admin
 **Response `200`:**
 ```json
 {
-  "paymentId": "b018b23b-9931-4438-b55f-782edb05b4c2",
-  "status": "processed"
+  "success": true,
+  "message": "Success",
+  "data": {
+    "paymentId": "b018b23b-9931-4438-b55f-782edb05b4c2",
+    "status": "processed"
+  }
 }
 ```
 
-**Response `404`** — pagamento não encontrado.
+**Response `404`** — `{ "success": false, "message": "Payment not found: ...", "data": null }`.
 
 ---
 
@@ -337,8 +377,12 @@ npx prisma migrate deploy
 ### Subir a API
 
 ```bash
-npm start
+npm run build      # compila src/ → dist/ (obrigatório antes de npm start)
+npm start          # node dist/index.js
 # API disponível em http://localhost:3000
+
+npm run dev        # desenvolvimento com hot reload (tsx watch src/index.ts)
+npm run typecheck  # verificação de tipos sem emitir ficheiros
 ```
 
 ---

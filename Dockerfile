@@ -28,9 +28,10 @@ COPY prisma.config.ts ./
 RUN npm ci
 COPY . .
 RUN npx prisma generate
+RUN npm run build
 RUN npm prune --omit=dev && npm cache clean --force
 RUN addgroup -g 1001 -S app && adduser -S app -u 1001 -G app \
   && chown -R app:app /app
 USER app
 EXPOSE 3000
-CMD ["node", "src/index.js"]
+CMD ["node", "dist/index.js"]
